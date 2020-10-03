@@ -1,2 +1,2 @@
-# timetable_creator
+# Time Table Creator
 Time Table Creator Fiverr Project
