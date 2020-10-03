@@ -1,0 +1,30 @@
+/*
+ * Empty Stylesheet file.
+ */
+
+.mainFxmlClass {
+
+}
+
+.root{
+    -fx-background-color : #dce1e3;
+}
+
+.title{
+    -fx-text-fill : black;
+}
+
+.hbox{
+    -fx-background-color: black;
+     -fx-spacing: 100;
+}
+
+.button{
+    /*-fx-background-color :  #29b6f2;*/
+    -fx-background-color :  #9fbdc7;
+    -fx-cursor: hand;    
+}
+
+.timetableButton{
+    /*-fx-padding : 20 20 20 20;*/
+}
