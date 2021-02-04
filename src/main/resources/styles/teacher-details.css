@@ -1,0 +1,21 @@
+/*
+ * Empty Stylesheet file.
+ */
+
+.mainFxmlClass {
+
+}
+
+.title{
+    -fx-text-fill : black;
+}
+
+.hbox{
+    -fx-background-color: black;
+     -fx-spacing: 100;
+}
+
+.button{
+    -fx-background-color :  #9fbdc7;
+    -fx-cursor: hand;    
+}

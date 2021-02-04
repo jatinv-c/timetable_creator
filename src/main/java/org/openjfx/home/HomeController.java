@@ -1,9 +1,10 @@
-
 package org.openjfx.home;
 
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Optional;
 import java.util.ResourceBundle;
@@ -25,6 +26,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.TilePane;
 import org.openjfx.fiverr5.App;
 import org.openjfx.fiverr5.Singleton;
+import org.openjfx.models.Teacher;
 import org.openjfx.models.TimeTable;
 import org.openjfx.models.WrapperDAO;
 
@@ -68,6 +70,10 @@ public class HomeController implements Initializable {
     private Button helpButton;
     @FXML
     private ImageView helpImageView;
+    @FXML
+    private Button teacherDetails;
+    @FXML
+    private Button emailTT;
 
     int timetableNo = 1;
 
@@ -84,8 +90,8 @@ public class HomeController implements Initializable {
         }
         timetableList = WrapperDAO.getList(TimeTable.class, "timetables.xml");
         if (timetableList == null) {
-            timetableList = FXCollections.observableArrayList();            
-        } 
+            timetableList = FXCollections.observableArrayList();
+        }
         populateTilePane();
     }
 
@@ -144,7 +150,7 @@ public class HomeController implements Initializable {
 
     @FXML
     private void onuserButtonClicked(ActionEvent event) {
-        try {            
+        try {
             App.setRoot("users");
         } catch (IOException ex) {
             Logger.getLogger(HomeController.class.getName()).log(Level.SEVERE, null, ex);
@@ -174,7 +180,7 @@ public class HomeController implements Initializable {
     private void onhelpButtonButton(ActionEvent event) {
         try {
             File file = new File(getClass().getClassLoader().getResource("html/help.html").toString().substring(6));
-            Desktop.getDesktop().open(new File("help.html"));            
+            Desktop.getDesktop().open(new File("help.html"));
         } catch (Exception ex) {
             Logger.getLogger(HomeController.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -243,6 +249,24 @@ public class HomeController implements Initializable {
         image = new Image(getClass().getClassLoader().getResource("images/help.png").toString());
         helpImageView.setImage(image);
         helpImageView.setCache(true);
+    }
+
+    @FXML
+    private void onteacherDetailsClicked(ActionEvent event) {        
+        try {
+            App.setRoot("teacher-details");
+        } catch (IOException ex) {
+            Logger.getLogger(HomeController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    @FXML
+    private void onemailTTClicked(ActionEvent event) {
+        try {
+            Desktop.getDesktop().browse(new URI("https://accounts.google.com/login?service=mail&lp=1"));
+        } catch (URISyntaxException | IOException ex) {
+            Logger.getLogger(TimetableController.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
 }
