@@ -1,0 +1,250 @@
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Main {
+
+	static String URL1 = "jdbc:mysql://localhost/<db1_name>";
+	static String USERNAME1 = "root";
+	static String PASSWORD1 = "";
+	static String TABLENAME1 = "";
+
+	static String URL2 = "jdbc:mysql://localhost/<db2_name>";
+	static String USERNAME2 = "root";
+	static String PASSWORD2 = "";
+	static String TABLENAME2 = "";
+
+	static String FILENAME1 = "file1.csv";
+	static String FILENAME2 = "file2.csv";
+
+	static String QUERY_STRING = "SELECT * from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = ";
+
+	public static void main(String[] args) {
+		ResultSet rs1 = getDataFromQuery(URL1, USERNAME1, PASSWORD1, TABLENAME1);
+		boolean file1Created = createCsvFromResultSet(rs1, FILENAME1);
+
+		if (file1Created) {
+			ResultSet rs2 = getDataFromQuery(URL2, USERNAME2, PASSWORD2, TABLENAME2);
+			boolean file2Created = createCsvFromResultSet(rs2, FILENAME2);
+
+			if (file2Created) {
+
+				if (compareCsvFiles(FILENAME1, FILENAME2)) {
+					
+					System.out.println("***********************************************");
+					System.out.println("The 2 files are the SAME!!!!");
+					System.out.println("***********************************************");
+					
+				}else {
+					
+					System.out.println("***********************************************");
+					System.out.println("The 2 files are DIFFERNET!!!!");
+					System.out.println("***********************************************");
+				}
+			}
+		}
+
+	}
+
+	public static ResultSet getDataFromQuery(String url, String username, String password, String table) {
+
+		Connection conn = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+
+		try {
+			conn = DriverManager.getConnection(url, username, password);
+			ps = conn.prepareStatement(QUERY_STRING + table);
+			rs = ps.executeQuery();
+
+		} catch (SQLException e) {
+			System.out.println("***********************************************");
+			System.out.println("Error while getting data from database");
+			System.out.println("Url : " + url + "Table : " + table);
+			System.out.println("***********************************************");
+
+		} finally {
+			if (conn != null) {
+				try {
+					conn.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+					System.out.println("***********************************************");
+					System.out.println("Error Closing Connection Object");
+					System.out.println("Url : " + url + "Table : " + table);
+					System.out.println("***********************************************");
+				}
+			}
+			if (ps != null) {
+				try {
+					ps.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+					System.out.println("***********************************************");
+					System.out.println("Error Closing Prepared Statement Object");
+					System.out.println("Url : " + url + "Table : " + table);
+					System.out.println("***********************************************");
+				}
+			}
+		}
+
+		return rs;
+	}
+
+	public static boolean createCsvFromResultSet(ResultSet rs, String filename) {
+
+		String csvStr = "";
+		List<String> colList = new ArrayList<>();
+
+		try {
+			// get column names
+			ResultSetMetaData rsmd = rs.getMetaData();
+			int col_count = rsmd.getColumnCount();
+			for (int i = 1; i <= col_count; i++) {
+				colList.add(rsmd.getColumnName(i));
+			}
+
+			csvStr += String.join(",", colList);
+			csvStr += "\n";
+
+			// get row data
+			while (rs.next()) {
+				for (int i = 0; i < col_count; i++) {
+					String val = rs.getString(colList.get(i));
+					csvStr += val;
+					if (i < col_count - 2) {
+						csvStr += ",";
+					}
+				}
+				csvStr += "\n";
+			}
+
+			Files.write(Paths.get(filename), csvStr.getBytes());
+
+		} catch (Exception e) {
+			e.printStackTrace();
+
+			System.out.println("***********************************************");
+			System.out.println("Error saving the data to the file");
+			System.out.println("File name : " + filename);
+			System.out.println("***********************************************");
+
+			return false;
+		}
+
+		return true;
+	}
+
+	public static boolean compareCsvFiles(String filename1, String filename2) {
+
+		if (countLinesNew(filename1) != countLinesNew(filename2)) {
+			return false;
+		}
+
+		try {
+			List<String> linesFile1 = Files.readAllLines(Paths.get(new URI(filename1)), StandardCharsets.US_ASCII);
+			List<String> linesFile2 = Files.readAllLines(Paths.get(new URI(filename2)), StandardCharsets.US_ASCII);
+			
+			for (int i = 0; i < linesFile1.size(); i++) {
+				
+				if (!linesFile1.get(i).equals(linesFile2.get(i))) {
+					
+					System.out.println("***********************************************");
+					System.out.println("Mismatch found in the row number " + (i+1));
+					System.out.println("***********************************************");
+					
+					return false;
+				}
+			}
+
+		} catch (IOException e) {
+			System.out.println("***********************************************");
+			System.out.println("IOException while comparing the 2 files");
+			System.out.println("***********************************************");
+			e.printStackTrace();
+			
+		} catch (URISyntaxException e) {
+			System.out.println("***********************************************");
+			System.out.println("Invalid URI error while comparing the 2 files");
+			System.out.println("***********************************************");
+			e.printStackTrace();
+			
+		}
+
+		return true;
+	}
+
+	public static int countLinesNew(String filename) {
+		InputStream is = null;
+		try {
+			is = new BufferedInputStream(new FileInputStream(filename));
+
+			byte[] c = new byte[1024];
+
+			int readChars = is.read(c);
+			if (readChars == -1) {
+				// bail out if nothing to read
+				return 0;
+			}
+
+			// make it easy for the optimizer to tune this loop
+			int count = 0;
+			while (readChars == 1024) {
+				for (int i = 0; i < 1024;) {
+					if (c[i++] == '\n') {
+						++count;
+					}
+				}
+				readChars = is.read(c);
+			}
+
+			// count remaining characters
+			while (readChars != -1) {
+				System.out.println(readChars);
+				for (int i = 0; i < readChars; ++i) {
+					if (c[i] == '\n') {
+						++count;
+					}
+				}
+				readChars = is.read(c);
+			}
+
+			return count == 0 ? 1 : count;
+		} catch (Exception e) {
+			e.printStackTrace();
+
+			System.out.println("***********************************************");
+			System.out.println("Error counting the number of lines in the file");
+			System.out.println("File name : " + filename);
+			System.out.println("***********************************************");
+
+		} finally {
+			try {
+				is.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+
+				System.out.println("***********************************************");
+				System.out.println("Error closing the InputStream object for the file");
+				System.out.println("File name : " + filename);
+				System.out.println("***********************************************");
+			}
+		}
+
+		return 0;
+	}
+}
