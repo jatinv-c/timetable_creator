@@ -1,0 +1,622 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package project.variance;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.DateFormatSymbols;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+
+/**
+ *
+ * @author Work
+ */
+public class WriteFile {
+
+    //Directory to save file, default is project root folder
+    private final String DIR = "";
+
+    //Headers for the excel file //UPDATED - headers
+    private final String[] headers = {"Vendor Name", "Marketing Operating Unit", "Invoice Number", "Invoice Identifier", "Invoice Status", "Invoice Date",
+        "Amount", "Paid Date", "Variance From Previous Month", "Variance % From Previous Month", "Status"};
+
+    /**
+     * 
+     * @param excelData
+     * @param filename
+     * @param sheet3Data
+     * @param accountsCloseData
+     * @param exceptionData
+     * @return 
+     */
+    public boolean createFile(List<List<String>> excelData, String filename, List<List<String>> sheet3Data,
+            List<List<String>> accountsCloseData, List<List<String>> exceptionData) {
+
+        try {
+            //create the excel workbook
+            SXSSFWorkbook workbook = new SXSSFWorkbook();
+
+            //create new sheet in the workbook
+            SXSSFSheet sheet = workbook.createSheet("Monthwise Variance");
+
+            //to maintain row index
+            int rowNo = 0;
+
+            //Create a new row in current sheet
+            Row row = sheet.createRow(rowNo++);
+
+            Cell cell;
+
+            //set red colored cell style
+            Font statusFont = workbook.createFont();
+            statusFont.setBold(true);
+            statusFont.setColor(IndexedColors.RED.getIndex());
+            CellStyle statusCellStyle = sheet.getWorkbook().createCellStyle();
+            statusCellStyle.setFont(statusFont);
+
+            //green background cell
+            CellStyle greenBgCellStyle = sheet.getWorkbook().createCellStyle();
+            greenBgCellStyle.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
+            greenBgCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            //blue background cell
+            CellStyle blueBgCellStyle = sheet.getWorkbook().createCellStyle();
+            blueBgCellStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+            blueBgCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            //yellow background cell
+            CellStyle yellowBgCellStyle = sheet.getWorkbook().createCellStyle();
+            yellowBgCellStyle.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
+            yellowBgCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            //red background cell
+            CellStyle redBgCellStyle = sheet.getWorkbook().createCellStyle();
+            redBgCellStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+            redBgCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            //Header custom style
+            Font headerFont = workbook.createFont();
+            headerFont.setFontHeightInPoints((short) 12);
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.DARK_RED.getIndex());
+            CellStyle headerCellStyle = sheet.getWorkbook().createCellStyle();
+            headerCellStyle.setFont(headerFont);
+
+            //green text cell
+            Font greenText = workbook.createFont();
+            greenText.setFontHeightInPoints((short) 12);
+            greenText.setBold(true);
+            greenText.setColor(IndexedColors.GREEN.getIndex());
+            CellStyle greenTextCellStyle = sheet.getWorkbook().createCellStyle();
+            greenTextCellStyle.setFont(greenText);
+
+            sheet.trackAllColumnsForAutoSizing();
+
+            //Add headers
+            for (int i = 0; i < headers.length; i++) {
+                cell = row.createCell(i);
+
+                //Set value to the cell
+                cell.setCellValue(headers[i]);
+
+                //set custom style to cell
+                cell.setCellStyle(headerCellStyle);
+            }
+
+            //Add rows
+            for (int i = 0; i < excelData.size(); i++) {
+
+                List<String> rowItem = excelData.get(i);
+
+                row = sheet.createRow(rowNo++);
+
+                //if no invoice data is avaliable for that month
+                if (!rowItem.get(10).equals("")) { //UPDATED - column no
+                    for (int j = 0; j < rowItem.size(); j++) {
+                        if (j == 2 || j == 10) {//UPDATED - column no
+                            cell = row.createCell(j);
+                            cell.setCellValue(rowItem.get(j));
+                            cell.setCellStyle(statusCellStyle);
+                        } else {
+                            cell = row.createCell(j);
+                            cell.setCellValue(rowItem.get(j));
+                        }
+
+                        //add blue backgroung to duplicate invoice no
+                        if (rowItem.get(10).equals("Duplicate") && (j == 2 || j == 6)) {//UPDATED - column no
+                            cell.setCellStyle(blueBgCellStyle);
+                        }
+
+                    }
+                    continue;
+                }
+
+                for (int j = 0; j < rowItem.size(); j++) {
+                    cell = row.createCell(j);
+                    cell.setCellValue(rowItem.get(j));
+
+                    boolean isFirst = false;
+                    if (i != 0) {
+                        List<String> rowItemPrev = excelData.get(i - 1);
+                        if (rowItemPrev.get(2).equals("")) {
+                            isFirst = true;
+                        }
+                    }
+
+                    if (i == 0 || isFirst) {
+                        cell.setCellStyle(greenBgCellStyle);
+                    }
+
+                    if (!rowItem.get(8).equals("")) {//UPDATED - column no
+                        double var = Double.parseDouble(rowItem.get(8));//UPDATED - column no
+                        double varPecrent = Double.parseDouble(rowItem.get(9).replace("%", ""));
+
+                        if (j == 8) {//UPDATED - column no
+                            if (Math.abs(var) > 5000) {
+                                cell.setCellStyle(redBgCellStyle);
+                            }
+                        }
+                        if (j == 9) {//UPDATED - column no
+                            if (Math.abs(varPecrent) > 25) {
+                                cell.setCellStyle(redBgCellStyle);
+                            }
+                        }
+                    }
+
+                }
+            }
+
+            //remove the Number stored as Text error in Invoice column
+            //sheet.addIgnoredErrors(new CellRangeAddress(1, 2000, 4, 8), IgnoredErrorType.NUMBER_STORED_AS_TEXT);
+            //to auto-size column width as per content
+            sheet.trackAllColumnsForAutoSizing();
+            for (int i = 0; i < headers.length; i++) {
+                //sheet.isColumnTrackedForAutoSizing(i);
+                sheet.autoSizeColumn(i);
+            }
+
+            /**
+             * --------------------------Second
+             * Sheet----------------------------
+             */
+            createAccountsClosedSheet(workbook, accountsCloseData);
+
+            /**
+             * --------------------------Third Sheet----------------------------
+             */
+            //add second sheet which contain invoice greater than 255 or 5000
+            //create new sheet in the workbook
+            SXSSFSheet sheet2 = workbook.createSheet("Variance >25% or >$5000");
+
+            //to maintain row index
+            rowNo = 0;
+
+            //Create a new row in current sheet
+            row = sheet2.createRow(rowNo++);
+
+            //headers for sheet 2
+            headers[6] = "Highlighting Variance > $5000";
+            headers[7] = "Highlighting % of Variance > 25%";
+
+            //Add headers
+            for (int i = 0; i < headers.length; i++) {
+                cell = row.createCell(i);
+
+                //Set value to the cell
+                cell.setCellValue(headers[i]);
+
+                //set custom style to cell
+                cell.setCellStyle(headerCellStyle);
+            }
+
+            boolean addNewRow = false;
+            List<List<String>> sheet2List = new ArrayList<>();
+            //Add rows
+            for (int i = 0; i < excelData.size(); i++) {
+                List<String> rowItem = excelData.get(i);
+                double var = 0;
+                double varPecrent = 0;
+
+                if (!rowItem.get(8).equals("")) {//UPDATED - column no
+                    var = Double.parseDouble(rowItem.get(8));//UPDATED - column no
+                    varPecrent = Double.parseDouble(rowItem.get(9).replace("%", ""));//UPDATED - column no
+
+                    if (Math.abs(var) > 5000 || Math.abs(varPecrent) > 25) {
+
+                        sheet2List.add(rowItem);
+                    }
+                }
+            }
+
+            if (sheet2List.size() > 1) {
+                int index = 0;
+
+                while (true) {
+                    List<String> rowItem = sheet2List.get(index);
+                    int lastIndex = rowItem.get(2).lastIndexOf("-");
+                    String inv = rowItem.get(2).substring(0, lastIndex);
+
+                    List<String> rowItem2 = sheet2List.get(index + 1);
+                    int lastIndex2 = rowItem2.get(2).lastIndexOf("-");
+                    String invNext = rowItem2.get(2).substring(0, lastIndex2);
+
+                    if (!inv.equals(invNext)) {
+                        List<String> temp = new ArrayList<>();
+                        for (int i = 0; i < rowItem.size(); i++) {
+                            temp.add("");
+                        }
+                        sheet2List.add(index + 1, temp);
+                        index++;
+                    }
+
+                    index++;
+
+                    if (index > sheet2List.size() - 2) {
+                        break;
+                    }
+                }
+            }
+
+            for (int i = 0; i < sheet2List.size(); i++) {
+                List<String> rowItem = sheet2List.get(i);
+                row = sheet2.createRow(rowNo++);
+
+                for (int j = 0; j < rowItem.size(); j++) {
+                    cell = row.createCell(j);
+                    cell.setCellValue(rowItem.get(j));
+                    if (j == 8 && !rowItem.get(j).equals("")) {//UPDATED - column no
+                        cell.setCellStyle(redBgCellStyle);
+                    }
+                    if (j == 9 && !rowItem.get(j).equals("")) {//UPDATED - column no
+                        cell.setCellStyle(redBgCellStyle);
+                    }
+                }
+            }
+
+            //remove the Number stored as Text error in Invoice column
+            //sheet2.addIgnoredErrors(new CellRangeAddress(1, 2000, 4, 8), IgnoredErrorType.NUMBER_STORED_AS_TEXT);
+            sheet2.trackAllColumnsForAutoSizing();
+            //to auto-size column width as per content
+            for (int i = 0; i < headers.length; i++) {
+                //sheet2.isColumnTrackedForAutoSizing(i);
+                sheet2.autoSizeColumn(i);
+            }
+
+            /**
+             * --------------------------Fourth Sheet---------------------------
+             */
+            //add second sheet which contain invoice greater than 255 or 5000
+            //create new sheet in the workbook
+            SXSSFSheet sheet3 = workbook.createSheet("Sheet3");
+
+            //to maintain row index
+            rowNo = 0;
+
+            //Create a new row in current sheet
+            row = sheet3.createRow(rowNo++);
+
+            //headers for sheet 3 //UPDATED - headers
+            String[] headers3 = {"Vendor Name", "Marketing Operating Unit", "Invoice Number", "Invoice Identifier", "Invoice Status", "Invoice Date",
+                "Amount", "Paid Date", "Variance From Previous Month", "Variance % From Previous Month", "File Number", "Status"};
+
+            //Add headers
+            for (int i = 0; i < headers3.length; i++) {
+                cell = row.createCell(i);
+
+                //Set value to the cell
+                cell.setCellValue(headers3[i]);
+
+                //set custom style to cell
+                cell.setCellStyle(headerCellStyle);
+            }
+
+            //Add rows
+            for (int i = 0; i < sheet3Data.size(); i++) {
+
+                List<String> rowItem = sheet3Data.get(i);
+
+                row = sheet3.createRow(rowNo++);
+
+                for (int j = 0; j < rowItem.size(); j++) {
+
+                    if (rowItem.get(j) == null) {
+                        rowItem.set(j, "");
+                    }
+                    cell = row.createCell(j);
+                    cell.setCellValue(rowItem.get(j));
+
+//                    if (!rowItem.get(9).equals("") || !rowItem.get(10).equals("")) {
+                    //if file name is present
+                    if (!rowItem.get(10).equals("")) {//UPDATED - column no
+                        cell.setCellStyle(greenTextCellStyle);
+                        if (j == 11) {//UPDATED - column no
+                            if (rowItem.get(11).contains("Duplicate payments present")) {//UPDATED - column no
+                                cell.setCellStyle(blueBgCellStyle);
+                            } else if (!rowItem.get(11).equals("")) {//UPDATED - column no
+                                cell.setCellStyle(yellowBgCellStyle);
+                            }
+                        }
+
+                    } else if (i != 0) {
+                        if (!rowItem.get(11).equals("")) {//UPDATED - column no
+                            if (j == 11) {//UPDATED - column no
+                                //cell.setCellStyle(greenTextCellStyle);
+                                cell.setCellStyle(yellowBgCellStyle);
+                            }
+                        }
+
+                        if (j == 2 || j == 3) {
+                            //check if duplicate paymnets are there
+                            List<String> prevRowItem = sheet3Data.get(i - 1);
+                            if (prevRowItem.get(11).contains("Duplicate payments present")) {//UPDATED - column no
+                                //cell.setCellStyle(blueBgCellStyle);
+                            } else if (prevRowItem.get(2).equals(rowItem.get(2)) && prevRowItem.get(3).equals(rowItem.get(3))) {
+                                cell.setCellStyle(blueBgCellStyle);
+                            }
+                        }
+
+                    }
+
+                }
+            }
+
+            sheet3.trackAllColumnsForAutoSizing();
+            //to auto-size column width as per content
+            for (int i = 0; i < headers3.length; i++) {
+                sheet3.isColumnTrackedForAutoSizing(i);
+                sheet3.autoSizeColumn(i);
+            }
+
+            /**
+             * --------------------------Fifth Sheet---------------------------
+             */
+            createExceptionReportSheet(workbook, exceptionData);
+
+            //write the workbook to file
+            try ( FileOutputStream out = new FileOutputStream(new File(DIR + filename + ".xlsx"))) {
+                workbook.write(out);
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(WriteFile.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                Logger.getLogger(WriteFile.class.getName()).log(Level.SEVERE, null, ex);
+            } finally {
+                workbook.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }    
+
+    public void createAccountsClosedSheet(SXSSFWorkbook workbook, List<List<String>> accountsCloseData) {
+
+        final int VENDOR_NAME_COLUMN = 0;
+        final int INVOICE_NUMBER_COLUMN = 2;
+
+        try {
+
+            //create new sheet in the workbook
+            SXSSFSheet sheet = workbook.createSheet("Accouts To Be Closed");
+
+            //to maintain row index
+            int rowNo = 0;
+
+            //Create a new row in current sheet
+            Row row = sheet.createRow(rowNo++);
+
+            Cell cell;
+
+            //Header custom style
+            Font headerFont = workbook.createFont();
+            headerFont.setFontHeightInPoints((short) 12);
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.DARK_RED.getIndex());
+            CellStyle headerCellStyle = sheet.getWorkbook().createCellStyle();
+            headerCellStyle.setFont(headerFont);
+
+            //green text cell
+            Font greenText = workbook.createFont();
+            greenText.setFontHeightInPoints((short) 12);
+            greenText.setBold(true);
+            greenText.setColor(IndexedColors.GREEN.getIndex());
+            CellStyle greenTextCellStyle = sheet.getWorkbook().createCellStyle();
+            greenTextCellStyle.setFont(greenText);
+
+            //Add headers
+            String[] headersSheet2 = {"Vendor Name", "Missing Payments"};
+
+            for (int i = 0; i < headersSheet2.length; i++) {
+                cell = row.createCell(i);
+
+                //Set value to the cell
+                cell.setCellValue(headersSheet2[i]);
+
+                //set custom style to cell
+                cell.setCellStyle(headerCellStyle);
+            }
+
+            //Add rows
+            for (int i = 0; i < accountsCloseData.size(); i++) {
+
+                List<String> rowItem = accountsCloseData.get(i);
+
+                row = sheet.createRow(rowNo++);
+
+                cell = row.createCell(0);
+                cell.setCellValue(rowItem.get(VENDOR_NAME_COLUMN));
+
+                cell = row.createCell(1);
+                cell.setCellValue(rowItem.get(INVOICE_NUMBER_COLUMN));
+                cell.setCellStyle(greenTextCellStyle);
+//                for (int j = 0; j < rowItem.size(); j++) {
+//                    if (j == VENDOR_NAME_COLUMN || j == INVOICE_NUMBER_COLUMN) {
+//                        cell = row.createCell(j);
+//                        cell.setCellValue(rowItem.get(j));
+//
+//                        if (j == INVOICE_NUMBER_COLUMN) {
+//                            cell.setCellStyle(greenTextCellStyle);
+//                        }
+//                    }
+//
+//                }
+
+                if (i < accountsCloseData.size() - 1) {
+
+                    List<String> nextRow = accountsCloseData.get(i + 1);
+
+                    String currInv = rowItem.get(INVOICE_NUMBER_COLUMN).substring(0, rowItem.get(INVOICE_NUMBER_COLUMN).lastIndexOf("-"));
+                    String nextInv = nextRow.get(INVOICE_NUMBER_COLUMN).substring(0, nextRow.get(INVOICE_NUMBER_COLUMN).lastIndexOf("-"));
+
+                    if (!currInv.equals(nextInv)) {
+
+                        sheet.createRow(rowNo++);
+                    }
+                }
+
+            }
+
+            sheet.trackAllColumnsForAutoSizing();
+
+            //to auto-size column width as per content
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+        } catch (Exception e) {
+
+            Logger.getLogger(WriteFile.class.getName()).log(Level.SEVERE, null, e);
+        }
+
+    }
+
+    public void createExceptionReportSheet(SXSSFWorkbook workbook, List<List<String>> exceptionData) {
+
+        final int INVOICE_NUMBER_COLUMN = 2;
+
+        try {
+
+            //create new sheet in the workbook
+            SXSSFSheet sheet = workbook.createSheet("Exception Report");
+
+            Cell cell;
+
+            //Header custom style
+            Font headerFont = workbook.createFont();
+            headerFont.setFontHeightInPoints((short) 12);
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.DARK_RED.getIndex());
+            CellStyle headerCellStyle = sheet.getWorkbook().createCellStyle();
+            headerCellStyle.setFont(headerFont);
+
+            //green text cell
+            Font greenText = workbook.createFont();
+            greenText.setFontHeightInPoints((short) 12);
+            greenText.setBold(true);
+            greenText.setColor(IndexedColors.GREEN.getIndex());
+            CellStyle greenTextCellStyle = sheet.getWorkbook().createCellStyle();
+            greenTextCellStyle.setFont(greenText);
+
+            //to maintain row index
+            int rowNo = 0;
+
+            //Create a new row in current sheet
+            Row row = sheet.createRow(rowNo++);
+
+            //headers for sheet 3 //UPDATED - headers
+            String[] headers3 = {"Vendor Name", "Marketing Operating Unit", "Invoice Number", "Invoice Identifier", "Invoice Status", "Invoice Date",
+                "Amount", "Paid Date", "Variance From Previous Month", "Variance % From Previous Month", "File Number", "Status"};
+
+            int indexes[] = {0, 3, 4, 7, 8, 9};
+            List<Integer> headerSkipIndexList = Arrays.stream(indexes).boxed().collect(Collectors.toList());
+
+            int colIndex = 0;
+            //Add headers
+            for (int i = 0; i < headers3.length; i++) {
+
+                if (headerSkipIndexList.contains(i)) {
+                    continue;
+                }
+
+                cell = row.createCell(colIndex++);
+
+                //Set value to the cell
+                cell.setCellValue(headers3[i]);
+
+                //set custom style to cell
+                cell.setCellStyle(headerCellStyle);
+
+            }
+
+            colIndex = 0;
+            //Add rows
+            for (int i = 0; i < exceptionData.size(); i++) {
+
+                List<String> rowItem = exceptionData.get(i);
+
+                row = sheet.createRow(rowNo++);
+
+                for (int j = 0; j < rowItem.size(); j++) {
+                    if (headerSkipIndexList.contains(j)) {
+                        continue;
+                    }
+
+                    cell = row.createCell(colIndex++);
+
+                    cell.setCellValue(rowItem.get(j));
+
+                    if (j == INVOICE_NUMBER_COLUMN) {
+                        cell.setCellStyle(greenTextCellStyle);
+                    }
+
+                }
+                colIndex = 0;
+
+                if (i < exceptionData.size() - 1) {
+                    List<String> nextRowItem = exceptionData.get(i + 1);
+
+                    int index = rowItem.get(INVOICE_NUMBER_COLUMN).lastIndexOf("-");
+                    int indexNext = nextRowItem.get(INVOICE_NUMBER_COLUMN).lastIndexOf("-");
+
+                    if (!rowItem.get(INVOICE_NUMBER_COLUMN).substring(0, index)
+                            .equals(nextRowItem.get(INVOICE_NUMBER_COLUMN).substring(0, indexNext))) {
+
+                        sheet.createRow(rowNo++);
+                    }
+                }
+            }
+
+            sheet.trackAllColumnsForAutoSizing();
+            //to auto-size column width as per content
+            for (int i = 0; i < headers3.length; i++) {
+                sheet.isColumnTrackedForAutoSizing(i);
+                sheet.autoSizeColumn(i);
+            }
+
+        } catch (Exception e) {
+
+            Logger.getLogger(WriteFile.class.getName()).log(Level.SEVERE, null, e);
+        }
+
+    }
+
+}
