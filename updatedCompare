@@ -1,0 +1,290 @@
+
+package CsvCompareJDBC;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class Main {
+
+//    static String URL1 = "jdbc:mysql://localhost/<db1_name>";
+    static String URL1 = "jdbc:mysql://localhost/BloodBankRegisterySystem";
+    static String USERNAME1 = "root";
+    static String PASSWORD1 = "root";
+    static String URL1_COL1_KEYOWRD = "Target";
+
+//    static String URL2 = "jdbc:mysql://localhost/<db2_name>";
+    static String URL2 = "jdbc:mysql://localhost/BloodBankRegisterySystem";
+    static String USERNAME2 = "root";
+    static String PASSWORD2 = "root";
+    static String URL2_COL1_KEYOWRD = "Source";
+
+    //will be saved in project root directory
+    static String FILENAME1 = "file1.csv";
+    static String FILENAME2 = "file2.csv";
+
+//    static String QUERY_STRING = "SELECT * from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = \'<table_name>\'";
+    static String QUERY_STRING_1 = "SELECT * from Recipients"; //for database 1
+    static String QUERY_STRING_2 = "SELECT * from Recipients_new"; //for database 2
+
+    public static void main(String[] args) {
+
+        boolean file1Created = generateDataFromQuery(URL1, USERNAME1, PASSWORD1, QUERY_STRING_1, FILENAME1);
+
+        if (file1Created) {
+            boolean file2Created = generateDataFromQuery(URL2, USERNAME2, PASSWORD2, QUERY_STRING_2, FILENAME2);
+
+            if (file2Created) {
+
+                if (compareCsvFiles(FILENAME1, FILENAME2)) {
+
+                    System.out.println("***********************************************");
+                    System.out.println("The 2 files are the SAME!!!!");
+                    System.out.println("***********************************************");
+
+                } else {
+
+                    System.out.println("***********************************************");
+                    System.out.println("The 2 files are DIFFERNET!!!!");
+                    System.out.println("***********************************************");
+                }
+            }
+        }
+
+    }
+
+    public static boolean generateDataFromQuery(String url, String username, String password, String query, String filename) {
+
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs;
+
+        try {
+            conn = DriverManager.getConnection(url, username, password);
+            ps = conn.prepareStatement(query);
+            rs = ps.executeQuery();
+
+            return createCsvFromResultSet(rs, filename);
+        } catch (SQLException e) {
+            System.out.println("***********************************************");
+            System.out.println("Error while getting data from database");
+            System.out.println("Url : " + url + "Table : " + query);
+            System.out.println("***********************************************");
+
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+                    System.out.println("***********************************************");
+                    System.out.println("Error Closing Connection Object");
+                    System.out.println("Url : " + url + "Table : " + query);
+                    System.out.println("***********************************************");
+                }
+            }
+            if (ps != null) {
+                try {
+                    ps.close();
+                } catch (SQLException e) {
+                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+                    System.out.println("***********************************************");
+                    System.out.println("Error Closing Prepared Statement Object");
+                    System.out.println("Url : " + url + "Table : " + query);
+                    System.out.println("***********************************************");
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public static boolean createCsvFromResultSet(ResultSet rs, String filename) {
+
+        String csvStr = "";
+        List<String> colList = new ArrayList<>();
+
+        try {
+            // get column names
+            ResultSetMetaData rsmd = rs.getMetaData();
+            int col_count = rsmd.getColumnCount();
+            for (int i = 1; i <= col_count; i++) {
+                colList.add(rsmd.getColumnName(i));
+            }
+
+            csvStr += String.join(",", colList);
+            csvStr += "\n";
+
+            // get row data
+            while (rs.next()) {
+                for (int i = 0; i < col_count; i++) {
+                    String val = rs.getString(colList.get(i));
+                    csvStr += val;
+                    if (i < col_count - 2) {
+                        csvStr += ",";
+                    }
+                }
+                csvStr += "\n";
+            }
+
+            Files.write(Paths.get(filename), csvStr.getBytes());
+
+        } catch (Exception e) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+
+            System.out.println("***********************************************");
+            System.out.println("Error saving the data to the file");
+            System.out.println("File name : " + filename);
+            System.out.println("***********************************************");
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static boolean compareCsvFiles(String filename1, String filename2) {
+
+        if (countLinesNew(filename1) != countLinesNew(filename2)) {
+            return false;
+        }
+
+        try {
+            List<String> linesFile1 = Files.readAllLines(Paths.get(new File(filename1).getAbsolutePath()), StandardCharsets.US_ASCII);
+            List<String> linesFile2 = Files.readAllLines(Paths.get(new File(filename2).getAbsolutePath()), StandardCharsets.US_ASCII);
+
+            for (int i = 0; i < linesFile1.size(); i++) {
+
+                if (i == 0) {
+                    //check for keywords in column 1 at position 1
+                    if (!linesFile1.get(i).split(",")[0].equals(URL1_COL1_KEYOWRD)) {
+                        System.out.println("***********************************************");
+                        System.out.println("In URL 1 the keyword at col 1 position 1 is not " + URL1_COL1_KEYOWRD);
+                        System.out.println("***********************************************");
+
+                        return false;
+                    }
+                    if (!linesFile2.get(i).split(",")[0].equals(URL2_COL1_KEYOWRD)) {
+                        System.out.println("***********************************************");
+                        System.out.println("In URL 2 the keyword at col 1 position 1 is not " + URL1_COL1_KEYOWRD);
+                        System.out.println("***********************************************");
+
+                        return false;
+                    }
+
+                } else if (!linesFile1.get(i).equals(linesFile2.get(i))) {
+
+                    String[] words_arr_1 = linesFile1.get(i).split(",");
+                    String[] words_arr_2 = linesFile2.get(i).split(",");
+
+                    System.out.println("***********************************************");
+                    System.out.println("Mismatch found in the row number " + (i + 1));
+                    System.out.println("***********************************************");
+
+                    for (int j = 0; j < words_arr_1.length; j++) {
+
+                        if (!words_arr_1[j].equals(words_arr_2[j])) {
+                            
+                            System.out.println("The value \'" + words_arr_1[j] + "\' does not match \'" + words_arr_2[j] + "\' at column number " + (j + 1));                            
+                            
+                            break;
+                        }
+                    }
+
+                    return false;
+                }
+            }
+
+        } catch (IOException e) {
+            System.out.println("***********************************************");
+            System.out.println("IOException while comparing the 2 files");
+            System.out.println("***********************************************");
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+
+        } catch (Exception e) {
+            System.out.println("***********************************************");
+            System.out.println("error while comparing the 2 files");
+            System.out.println("***********************************************");
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+
+        }
+
+        return true;
+    }
+
+    public static int countLinesNew(String filename) {
+        InputStream is = null;
+        try {
+            is = new BufferedInputStream(new FileInputStream(filename));
+
+            byte[] c = new byte[1024];
+
+            int readChars = is.read(c);
+            if (readChars == -1) {
+                // bail out if nothing to read
+                return 0;
+            }
+
+            // make it easy for the optimizer to tune this loop
+            int count = 0;
+            while (readChars == 1024) {
+                for (int i = 0; i < 1024;) {
+                    if (c[i++] == '\n') {
+                        ++count;
+                    }
+                }
+                readChars = is.read(c);
+            }
+
+            // count remaining characters
+            while (readChars != -1) {
+                for (int i = 0; i < readChars; ++i) {
+                    if (c[i] == '\n') {
+                        ++count;
+                    }
+                }
+                readChars = is.read(c);
+            }
+
+            return count == 0 ? 1 : count;
+        } catch (Exception e) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+
+            System.out.println("***********************************************");
+            System.out.println("Error counting the number of lines in the file");
+            System.out.println("File name : " + filename);
+            System.out.println("***********************************************");
+
+        } finally {
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (Exception e) {
+                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, e);
+
+                    System.out.println("***********************************************");
+                    System.out.println("Error closing the InputStream object for the file");
+                    System.out.println("File name : " + filename);
+                    System.out.println("***********************************************");
+                }
+            }
+        }
+
+        return 0;
+    }
+}
