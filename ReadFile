@@ -1,0 +1,108 @@
+
+package project.variance;
+
+import Model.RowItem;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+
+public class ReadInvoiceFile {
+
+    private final String DIR = ""; //currently reading files from project root directory    
+
+    private final int FILE_NO = 0;
+    private final int VENDOR_NAME = 4;
+    private final int MKTG_UNIT = 2;
+    private final int INVOICE_NO = 12;
+    private final int INVOICE_DATE = 11;
+    private final int AMOUNT = 14;
+
+    /**
+     * @param filename - name of the file stored in the directory specified in
+     * the DIR variable by default it is root directory of project
+     *
+     * @return - returns a list of rowItems objects containing values of
+     * students read from the excel file. If no data is there in the file, it
+     * returns an empty list
+     */
+    public List<RowItem> readDataFromFile(String filename) {
+
+        List<RowItem> rowList = new ArrayList<>();
+
+        //workbook is used so that both xls and xlsx file formats can be accepted
+        try ( Workbook wb = WorkbookFactory.create(new File(DIR + filename));) {
+
+            Sheet sheetAt = wb.getSheetAt(0);
+
+            for (Row row : sheetAt) {
+                if (row.getRowNum() == 0) { //Ignore the first row containing the headers
+                    continue;
+                }
+
+                if (row.getCell(AMOUNT) == null || row.getCell(AMOUNT).getCellType() == CellType.BLANK) {
+                    continue;
+                }
+
+                RowItem rowItem = new RowItem();
+
+                if (row.getCell(FILE_NO) == null || row.getCell(FILE_NO).getCellType() == CellType.BLANK) {
+                    rowItem.setFileNumber("--");
+                } else {
+                    if (row.getCell(FILE_NO).getCellType() == CellType.STRING) {
+                        rowItem.setFileNumber(row.getCell(FILE_NO).getStringCellValue() + "");
+                    } else {
+                        rowItem.setFileNumber(row.getCell(FILE_NO).getNumericCellValue() + "");
+                    }
+                }
+
+                if (row.getCell(VENDOR_NAME) == null || row.getCell(VENDOR_NAME).getCellType() == CellType.BLANK) {
+                    rowItem.setVendorName("");
+                } else {
+                    if (row.getCell(VENDOR_NAME).getCellType() == CellType.STRING) {
+                        rowItem.setVendorName(row.getCell(VENDOR_NAME).getStringCellValue() + "");
+                    } else {
+                        rowItem.setVendorName(row.getCell(VENDOR_NAME).getNumericCellValue() + "");
+                    }
+                }
+
+                if (row.getCell(MKTG_UNIT).getCellType() == CellType.STRING) {
+                    rowItem.setMktOpUnit(row.getCell(MKTG_UNIT).getStringCellValue() + "");
+                } else {
+                    rowItem.setMktOpUnit(row.getCell(MKTG_UNIT).getNumericCellValue() + "");
+                }
+
+                rowItem.setInvoiceNo(row.getCell(INVOICE_NO).getStringCellValue());
+
+                if (row.getCell(INVOICE_DATE).getCellType() == CellType.STRING) {
+                    rowItem.setInvoiceDate(row.getCell(INVOICE_DATE).getStringCellValue() + "");
+                } else {
+                    rowItem.setInvoiceDate(row.getCell(INVOICE_DATE).getNumericCellValue() + "");
+                }
+
+                rowItem.setAmount(row.getCell(AMOUNT).getNumericCellValue());
+
+                rowItem.setPaidDate("");
+
+                //in case the row is empty
+                if (rowItem.getInvoiceNo().equals("")) {
+                    continue;
+                }
+
+                rowList.add(rowItem);
+            }
+
+            wb.close();
+        } catch (IOException ex) {
+            Logger.getLogger(ReadPaymentFile.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return rowList;
+    }
+}
